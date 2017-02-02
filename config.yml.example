@@ -1,0 +1,52 @@
+database_url: http://couchdb.address/
+scouts:
+    R1:
+        dev: /dev/input/event4
+        worker: GenericScout
+        serial: /dev/ttyACM0
+        x: 2
+        y: 2
+        w: 18
+        h: 9
+    R2:
+        dev: /dev/input/event4
+        worker: GenericScout
+        x: 2
+        y: 12
+        w: 18
+        h: 9
+    R3:
+        dev: /dev/input/event4
+        worker: GenericScout
+        x: 2
+        y: 22
+        w: 18
+        h: 9
+    B1:
+        dev: /dev/input/event13
+        worker: GenericScout
+        x: 24
+        y: 2
+        w: 18
+        h: 9
+    B2:
+        dev: /dev/input/event4
+        worker: GenericScout
+        x: 24
+        y: 12
+        w: 18
+        h: 9
+    B3:
+        dev: /dev/input/event4
+        worker: GenericScout
+        x: 24
+        y: 22
+        w: 18
+        h: 9
+    master:
+        dev: /dev/input/event4
+        worker: ScoutMaster
+        x: 48
+        y: 9
+        w: 36
+        h: 16
