@@ -3,6 +3,7 @@ class ScoutMaster < GenericScout
   def initialize  label, dev, x, y, w, h, serial=nil
     super label, dev, x, y, w, h, serial
     @bg = Curses::COLOR_MAGENTA
+    @state = :scoutmaster
     @lines = [
         '1',
         ' 2',
@@ -16,7 +17,6 @@ class ScoutMaster < GenericScout
         '10',
         '11',
         '12',
-        '13',
     ]
   end
 
@@ -32,12 +32,11 @@ class ScoutMaster < GenericScout
     end
     @win.box '|', '-'
 
-    0.upto(13) do |i|
+    0.upto(12) do |i|
         text @lines[i], 1,i+1
     end
-    text @lines[0], 1,1
 
-    text Curses::colors.to_s, 4,4
+    text " - #{@state.to_s.center(12)} - ", 4, 13
     text "BATT: #{battery_life}", 24, 14
     text Time.now.strftime("%Y-%m-%d %I:%M %p"), 2, 14
 

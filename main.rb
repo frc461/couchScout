@@ -47,8 +47,9 @@ begin
     end
 
     if safe
-      close_screen
+      puts "Before threads kill"
       threadpool.each(&:kill)
+      puts "After threads kill"
 
       workers.each do |w|
         puts w.inspect
@@ -58,6 +59,7 @@ begin
     else
     end
   end
+
   threadpool.each(&:join)
 ensure
   close_screen

@@ -38,9 +38,9 @@ class GenericScout
         when Curses::COLOR_RED
             arr << [255, 0, 0]
         when Curses::COLOR_BLUE
-            arr << [0,255,0]
-        when Curses::COLOR_GREEN
             arr << [0,0,255]
+        when Curses::COLOR_GREEN
+            arr << [0,255,0]
         when Curses::COLOR_YELLOW
             arr << [255,255,0]
         when Curses::COLOR_MAGENTA
@@ -129,6 +129,13 @@ class GenericScout
         @lines[1] = m
     end
 
+    def redraw_prestart
+      @lines[0] = "#{@team.rjust(4, '0')}          #{label}".ljust(16)
+      @lines[1] = "MATCH#{@data['match_number'].to_s.rjust(4, '0')} POS#{@data['start_position']}" 
+    end
+
+    end
+
     def prestart e
         @bg = @label.match(/R/) ? Curses::COLOR_RED : Curses::COLOR_BLUE
         case e
@@ -145,12 +152,12 @@ class GenericScout
         when 'F'
             @data['start_position'] = 3
         end
-        redraw_auto
+        redraw_prestart
     end
 
     def redraw_auto
-        @lines[0] = "#{@team.rjust(4,'0')} H#{@data['auto_high_goal']}  L#{@data['auto_low_goal']} #{label}".ljust(15)
-        @lines[1] = " G#{@data['auto_gear_pos']}  #{@data['baseline_cross'] ? "BC" : '  '}   DUMP#{@data['auto_hopper']}"
+      @lines[0] = "#{@team.rjust(4,'0')} H#{@data['auto_high_goal'].to_s.rjust(2, '0')}  L#{@data['auto_low_goal'].to_s.rjust(2, '0')} #{label}".ljust(16)
+      @lines[1] = "G#{@data['auto_gear_pos']} #{@data['baseline_cross'] ? "BC" : '  '} V#{@data['auto_violations']}  DUMP#{@data['auto_hopper']}"
     end
 
     def auto e
@@ -178,6 +185,18 @@ class GenericScout
             @state = :auto_high_goal
         when 'L'
             @state = :auto_low_goal
+        when 'Dot'
+          @data['auto_violation'] ||= 0
+          if @data['auto_violaton'] < 10
+          @data['auto_violation'] += 1
+          else
+            @data['auto_violation'] = '*'
+          end
+        when 'Comma'
+          @data['auto_violation'] ||= 0
+          if @data['auto_violation'] > 0
+            @data['auto_violation'] -= 1
+          end
         end
         redraw_auto
     end
@@ -219,11 +238,11 @@ class GenericScout
             end
         end
         redraw_auto
-    end
+    end 
 
     def redraw_teleop
-        @lines[0] = "#{@team.rjust(4, '0')}"
-        @lines[1] = "G#{@data['teleop_gear']}         #{@data['climbed'] ? "C" : '  '}" #doesn't work, indentation gets weird
+      @lines[0] = "#{@team.rjust(4, '0')}          #{label}".ljust(16)
+      @lines[1] = "G#{@data['teleop_gear'].to_s.rjust(2, '0')} D#{@data['teleop_hopper'].to_s.rjust(1, '0')}  #{@data['collect_human'] ? "U" : ' '}#{@data['collect_floor'] ? "I" : ' '}#{@data['collect_hopper'] ? "O" : ' '} #{@data['climbed'] ? "C" : ' '} V#{@data['teleop_violation'].to_s.rjust(1, '0')}" 
     end
 
     def teleop e
@@ -238,22 +257,56 @@ class GenericScout
                 @data['climbed'] = true
             end
         when 'G'
-            @state = :teleop_gear
-        end
-        redraw_teleop
-    end
+            @data['teleop_gear'] ||= 0
+            if @data['teleop_gear'] < 16
+              @data['teleop_gear'] += 1
+            end
+        when 'F'
+          @data['teleop_gear'] ||= 0
+          if @data['teleop_gear'] > 0
+            @data['teleop_gear'] -= 1
+          end
+        when 'S'
+            @data['teleop_hopper'] ||= 0
+            if @data['teleop_hopper'] > 0
+                @data['teleop_hopper'] -= 1
+            end
+        when 'D'
+            @data['teleop_hopper'] ||= 0
+            if @data['teleop_hopper'] < 5
+                @data['teleop_hopper'] += 1
+            end
 
-    def teleop_gear e
-        case e
-        when '1'
-            @data['teleop_gear_pos'] = 1
-            @state = :teleop
-        when '2'
-            @data['teleop_gear_pos'] = 2
-            @state = :teleop
-        when '3'
-            @data['teleop_gear_pos'] = 3
-            @state = :teleop
+        when 'Dot'
+          @data['teleop_violation'] ||= 0
+          if @data['teleop_violation'] < 10
+          @data['teleop_violation'] += 1
+          else
+            @data['teleop_violation'] = '*' #keep counting/ display * only
+          end
+        when 'Comma'
+          @data['teleop_violation'] ||= 0
+          if @data['teleop_violation'] > 0
+            @data['teleop_violation'] -= 1
+          end
+        when 'U'
+          if @data['collect_human'] == true
+            @data['collect_human'] = false
+          else
+            @data['collect_human'] = true
+          end
+        when 'I'
+          if @data['collect_floor'] == true
+            @data['collect_floor'] = false
+          else
+            @data['collect_floor'] = true
+          end
+        when 'O'
+          if @data['collect_hopper'] == true
+            @data['collect_hopper'] = false
+          else
+            @data['collect_hopper'] = true
+          end
         end
         redraw_teleop
     end
@@ -266,5 +319,4 @@ class GenericScout
     def postmatch e
         @bg = Curses::COLOR_WHITE
         @lines[0] = e.ljust(16) 
-    end
     end
