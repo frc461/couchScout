@@ -1,23 +1,10 @@
 require './scouts/base.rb'
 class ScoutMaster < GenericScout
-  def initialize  label, dev, x, y, w, h, serial=nil
-    super label, dev, x, y, w, h, serial
+  def initialize  label, dev, x, y, w, h, serial, ov
+    super label, dev, x, y, w, h, serial, ov
     @bg = Curses::COLOR_MAGENTA
     @state = :scoutmaster
-    @lines = [
-        '1',
-        ' 2',
-        '  3',
-        '   4',
-        '    5',
-        '     6',
-        '7',
-        '8',
-        '9',
-        '10',
-        '11',
-        '12',
-    ]
+    @lines = []
   end
 
   def battery_life
@@ -69,6 +56,7 @@ class ScoutMaster < GenericScout
 
   def scoutmaster e
      @lines[4] = e.ljust(16) 
+     @lines[5] = ''
   end
 
   def preview e
@@ -77,5 +65,10 @@ class ScoutMaster < GenericScout
 
   def schedule e
      @lines[6] = e.ljust(16) 
+     case e
+     when 'P'
+       data = {'tp' => 'ScoutMaster', 'ev' => 'NewMatch', 'data' => 'Q57'}
+       @overwatch.push data
+     end
   end
 end

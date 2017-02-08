@@ -10,8 +10,20 @@ Dir[File.dirname(__FILE__) + '/scouts/*.rb'].each {|file| require file }
 raw_config = File.read('./config.yml')
 CONFIG = YAML.load(raw_config)
 
+CONFIG['scouts'].map{|k, s| s['serial'] || nil}.delete_if{|s| s == nil}.each do |y|
+  puts 'Waiting on serial ports'
+  waiting = true
+  while waiting
+    sleep 1
+    print '.'
+    waiting = `lsof /dev/ttyACM*` =~ /Modem/
+  end
+end
+gets
+
 threadpool = []
 workers = {}
+overwatch = Overwatch.new
 
 include Curses
 
@@ -34,7 +46,8 @@ begin
   init_pair(COLOR_BLACK, COLOR_WHITE, COLOR_BLACK)
 
   CONFIG['scouts'].each do |label, cnf|
-    w = Object::const_get(cnf['worker']).new(label, cnf['dev'], cnf['x'], cnf['y'], cnf['w'], cnf['h'], cnf['serial'])
+    w = Object::const_get(cnf['worker']).new(label, cnf['dev'], cnf['x'], cnf['y'], cnf['w'], cnf['h'], cnf['serial'], overwatch)
+    overwatch.create label
     workers[cnf['label']] = w
     threadpool << Thread.new{w.run}
     w.redraw
@@ -47,13 +60,13 @@ begin
     end
 
     if safe
-      puts "Before threads kill"
+      close_screen
       threadpool.each(&:kill)
-      puts "After threads kill"
 
       workers.each do |w|
         puts w.inspect
       end
+      puts workers.inspect
 
       puts "Goodbye"
     else
@@ -62,7 +75,6 @@ begin
 
   threadpool.each(&:join)
 ensure
-  close_screen
   `stty echo`
   `clear`
 end
