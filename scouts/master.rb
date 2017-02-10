@@ -19,13 +19,13 @@ class ScoutMaster < GenericScout
     end
     @win.box '|', '-'
 
-    0.upto(12) do |i|
+    0.upto(@h - 2) do |i|
         text @lines[i], 1,i+1
     end
 
-    text " - #{@state.to_s.center(12)} - ", 4, 13
-    text "BATT: #{battery_life}", 24, 14
-    text Time.now.strftime("%Y-%m-%d %I:%M %p"), 2, 14
+    text " - #{@state.to_s.center(@w - 8)} - ", 1, @h - 3
+    text "BATT: #{battery_life}", @w - 12, @h - 2
+    text Time.now.strftime("%Y-%m-%d %I:%M %p"), 2, @h - 2
 
     @win.refresh
   end
@@ -66,8 +66,11 @@ class ScoutMaster < GenericScout
   def schedule e
      @lines[6] = e.ljust(16) 
      case e
-     when 'P'
-       data = {'tp' => 'ScoutMaster', 'ev' => 'NewMatch', 'data' => 'Q57'}
+     when /^[0-9]/
+       @match_number ||= ''
+       @match_number += e
+     when 'Enter'
+       data = {'tp' => 'ScoutMaster', 'ev' => 'NewMatch', 'data' => 'Q' + @match_number}
        @overwatch.push data
      end
   end

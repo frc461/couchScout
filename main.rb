@@ -19,7 +19,6 @@ CONFIG['scouts'].map{|k, s| s['serial'] || nil}.delete_if{|s| s == nil}.each do 
     waiting = `lsof /dev/ttyACM*` =~ /Modem/
   end
 end
-gets
 
 threadpool = []
 workers = {}

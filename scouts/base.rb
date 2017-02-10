@@ -22,6 +22,7 @@ class GenericScout
     @serial = serial
     @data = {}
     @overwatch = ov
+    @database = Database.new
     if serial 
       @serialdev = SerialPort.new(serial, 9600, 8, 1, 0)
     else
@@ -177,7 +178,7 @@ class GenericScout
 
   def redraw_auto
     @lines[0] = "#{@team.rjust(4,'0')} H#{@data['auto_high_goal'].to_s.rjust(2, '0')}  L#{@data['auto_low_goal'].to_s.rjust(2, '0')} #{label}".ljust(16)
-    @lines[1] = "G#{@data['auto_gear_pos']} #{@data['baseline_cross'] ? "BC" : '  '} V#{@data['auto_violations']}  DUMP#{@data['auto_hopper']}"
+    @lines[1] = "G#{@data['auto_gear_pos']} #{@data['baseline_cross'] ? "BC" : '  '} V#{@data['auto_violation']}  DUMP#{@data['auto_hopper']}"
   end
 
   def auto e
@@ -207,11 +208,7 @@ class GenericScout
       @state = :auto_low_goal
     when 'Dot'
       @data['auto_violation'] ||= 0
-      if @data['auto_violaton'] < 10
-        @data['auto_violation'] += 1
-      else
-        @data['auto_violation'] = '*'
-      end
+      @data['auto_violation'] += 1
     when 'Comma'
       @data['auto_violation'] ||= 0
       if @data['auto_violation'] > 0
@@ -261,7 +258,7 @@ class GenericScout
   end 
 
   def redraw_teleop
-    @lines[0] = "#{@team.rjust(4, '0')} H#{@data['teleop_high_goal'].to_s.rjust(2, '0')} L#{@data['teleop_low_goal'].to_s.rjust(2, '0')}  #{label}".ljust(15)[0..15]
+    @lines[0] = "#{@team.rjust(4, '0')} H#{(@data['teleop_high_goal'] || []).last.to_s.rjust(2, '0')} L#{(@data['teleop_low_goal'] || []).last.to_s.rjust(2, '0')}  #{label}".ljust(15)[0..15]
     @lines[1] = "G#{@data['teleop_gear'].to_s.rjust(2, '0')} D#{@data['teleop_hopper'].to_s.rjust(1, '0')}  #{@data['collect_human'] ? "U" : ' '}#{@data['collect_floor'] ? "I" : ' '}#{@data['collect_hopper'] ? "O" : ' '} #{@data['climbed'] ? "C" : ' '} V#{(@data['teleop_violation'] || 0) > 9 ? '*' : @data['teleop_violation'].to_s.rjust(1, '0')}" 
   end
 
@@ -335,22 +332,30 @@ class GenericScout
   def teleop_high_goal e
     case e     
     when /^[0-9]$/
-      @data['teleop_high_goal'] ||= ''
-      if @data['teleop_high_goal'].length < 2
-        @data['teleop_high_goal'] += e
-      else @state = :teleop
+      @data['teleop_high_goal'] ||= ['']
+      if @data['teleop_high_goal'][-1].length == 0
+        @data['teleop_high_goal'][-1] += e
+      elsif @data['teleop_high_goal'].last.length == 1
+        @data['teleop_high_goal'][-1] += e
+        @state = :teleop
+      else 
+        @data['teleop_high_goal'] << e
       end
     end
     redraw_teleop
   end
+ 
   def teleop_low_goal e
     case e
     when /^[0-9]$/
-      @data['teleop_low_goal'] ||= ''
-
-      if @data['teleop_low_goal'].length < 2
-        @data['teleop_low_goal'] += e
-      else @state = :teleop
+      @data['teleop_low_goal'] ||= ['']   
+      if @data['teleop_low_goal'][-1].length == 0
+        @data['teleop_low_goal'][-1] += e
+      elsif @data['teleop_low_goal'].last.length == 1
+        @data['teleop_low_goal'][-1] += e
+        @state = :teleop
+      else 
+        @data['teleop_low_goal'] << e
       end
     end
     redraw_teleop
@@ -384,6 +389,10 @@ class GenericScout
       @data['comments'] = @data['comments'] + ","
     when 'Slash'
       @data['comments'] = @data['comments'] + "?"
+    when 'Esc'
+      @data['team'] = @team
+      @data['type'] = "Match"
+      @database.pushData(@data)
     end
     redraw_postmatch
   end
