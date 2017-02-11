@@ -11,6 +11,10 @@ class ScoutMaster < GenericScout
       (`cat /sys/class/power_supply/BAT0/charge_now`.to_i / `cat /sys/class/power_supply/BAT0/charge_full`.to_f * 100).round(1)
   end
 
+  def power_status
+    `cat /sys/class/power_supply/AC/online` =~ /^1/ ? 'ON AC' : ' BATT'
+  end
+
   def redraw
     @win.clear
     @win.attrset(Curses::color_pair(@bg))
@@ -24,7 +28,7 @@ class ScoutMaster < GenericScout
     end
 
     text " - #{@state.to_s.center(@w - 8)} - ", 1, @h - 3
-    text "BATT: #{battery_life}", @w - 12, @h - 2
+    text "#{power_status}: #{battery_life}", @w - 14, @h - 2
     text Time.now.strftime("%Y-%m-%d %I:%M %p"), 2, @h - 2
 
     @win.refresh

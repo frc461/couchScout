@@ -3,7 +3,7 @@ require 'curses'
 class GenericScout
   attr_reader :label, :team, :state
   def initialize label, dev, x, y, w, h, serial, ov
-    @device = DevInput.new dev
+    @device = DevInput.new dev unless dev == '/dev/null'
     @win = Curses::Window.new(h,w,y,x)
     @db = Database.new
     @x = x
@@ -14,7 +14,7 @@ class GenericScout
     @team = ''
     @state = :prestart
     @match = 0
-    @matchq = []
+    @matchq = Queue.new
     @bg = @label.match(/R/) ? Curses::COLOR_RED : Curses::COLOR_BLUE
     @win.bkgd ' '.ord | Curses::color_pair(@bg)
     @uuid = ''
@@ -103,6 +103,7 @@ class GenericScout
   end
 
   def run
+    if @device
     @device.each do |event|
       # reject everything but key events
       next unless event.type == 1
@@ -144,6 +145,7 @@ class GenericScout
       self.send(@state, event.code_str)
       redraw
     end
+    end
   end
 
   def method_missing m, args
@@ -158,6 +160,7 @@ class GenericScout
   end
 
   def prestart e
+    @queue.pop
     @bg = @label.match(/R/) ? Curses::COLOR_RED : Curses::COLOR_BLUE
     case e
     when /^[0-9]$/
@@ -363,14 +366,9 @@ class GenericScout
 
   def redraw_postmatch
     @data['comments'] ||= ''
-    lines = @data['comments'].scan(/.{,16}/)
-    if lines.count > 2
-    @lines[0] = lines[-2]
-    @lines[1] = lines[-1]
-    else
-    @lines[0] = lines[0] || ''
-    @lines[1] = lines[1] || ''
-    end
+    lines = @data['comments'].scan(/.{1,16}/)
+    @lines[0] = lines[-2] || ''
+    @lines[1] = lines[-1] || ''
   end
 
   def postmatch e
@@ -392,9 +390,13 @@ class GenericScout
     when 'Esc'
       @data['team'] = @team
       @data['type'] = "Match"
+      @data['position'] = @label
+      @data['match'] = @match
       @database.pushData(@data)
+      @state = :prestart
     end
     redraw_postmatch
+    redraw_prestart
   end
 
   def parse_message topic, event, data
@@ -402,5 +404,6 @@ class GenericScout
     when 'NewMatch'
       @match = data['data']
     end
+    redraw
   end
 end
