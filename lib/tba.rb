@@ -1,3 +1,4 @@
+require 'yaml'
 require 'httparty'
 require 'json'
 
@@ -35,10 +36,32 @@ class TheBlueAlliance
 
   def events options={}
     call '/events/2017', options
-  end
+ end
+
+ def getmatch key
+ endpoint = '/event/' + key + '/matches'
+ call endpoint 
+ end
 end
 
 if __FILE__==$0
   tba = TheBlueAlliance.new
-  puts tba.events.map{|e| e['name']}
+  #puts tba.events.map{|e| e['key']}
+  event = ARGV[0]
+  match = tba.getmatch(event)
+  allthematches = {}
+  
+  match.each do |match|
+    matchdata = {}
+    matchdata['b1'] = match["alliances"]["blue"]["teams"][0].gsub(/[frc]/, "").to_i
+    matchdata['b2'] = match["alliances"]["blue"]["teams"][1].gsub(/[frc]/, "").to_i
+    matchdata['b3'] = match["alliances"]["blue"]["teams"][2].gsub(/[frc]/, "").to_i
+    matchdata['r1'] = match["alliances"]["red"]["teams"][0].gsub(/[frc]/, "").to_i
+    matchdata['r2'] = match["alliances"]["red"]["teams"][1].gsub(/[frc]/, "").to_i
+    matchdata['r3'] = match["alliances"]["red"]["teams"][2].gsub(/[frc]/, "").to_i
+    allthematches[match["comp_level"] + match["match_number"].to_s] = matchdata
+  end
+  matchfile = File.open("../events/#{event}.yaml", "w")
+  matchfile.puts allthematches
+  matchfile.close()
 end
