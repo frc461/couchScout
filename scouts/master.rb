@@ -74,7 +74,7 @@ class ScoutMaster < GenericScout
        @match_number ||= ''
        @match_number += e
      when 'Enter'
-       data = {'tp' => 'ScoutMaster', 'ev' => 'NewMatch', 'data' => 'Q' + @match_number}
+       data = {'tp' => 'ScoutMaster', 'ev' => 'NewMatch', 'match' => @match_number, 'teams' => {'R1' => '461', 'R2' => '1747', 'R3' => '868', 'B1' => '1501', 'B2' => '4272', 'B3' => '1646'}} 
        @overwatch.push data
      end
   end
