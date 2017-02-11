@@ -3,7 +3,7 @@ require 'curses'
 class GenericScout
   attr_reader :label, :team, :state
   def initialize label, dev, x, y, w, h, serial, ov
-    @device = DevInput.new dev
+    @device = DevInput.new dev unless dev == '/dev/null'
     @win = Curses::Window.new(h,w,y,x)
     @db = Database.new
     @x = x
@@ -13,8 +13,8 @@ class GenericScout
     @label = label
     @team = ''
     @state = :prestart
-    @match = 0
-    @matchq = []
+    @match = nil
+    @matchq = Queue.new
     @bg = @label.match(/R/) ? Curses::COLOR_RED : Curses::COLOR_BLUE
     @win.bkgd ' '.ord | Curses::color_pair(@bg)
     @uuid = ''
@@ -103,46 +103,55 @@ class GenericScout
   end
 
   def run
-    @device.each do |event|
-      # reject everything but key events
-      next unless event.type == 1
-      # reject everything but press events
-      next unless event.value == 1
-      # ignore numlock
-      next if event.code == 69
+    message = @overwatch.pop(@label)
+    topic = message.delete('tp')
+    ev = message.delete('ev')
+    parse_message(topic, ev, message)
+    tmp = @matchq.pop
+    @match = tmp[0]
+    @team = tmp[1][@label]
+    if @device
+      @device.each do |event|
+        # reject everything but key events
+        next unless event.type == 1
+        # reject everything but press events
+        next unless event.value == 1
+        # ignore numlock
+        next if event.code == 69
 
-      while(@overwatch.has_message(@label))
-        message = @overwatch.pop(@label)
-        topic = message.delete('tp')
-        ev = message.delete('ev')
-        parse_message(topic, ev, message)
-      end
+        while(@overwatch.has_message(@label))
+          message = @overwatch.pop(@label)
+          topic = message.delete('tp')
+          ev = message.delete('ev')
+          parse_message(topic, ev, message)
+        end
 
-      case event.code_str
-      when "F5"
-        if @serial
-          @serialdev.write [0xFE, 0x52].chr.join
+        case event.code_str
+        when "F5"
+          if @serial
+            @serialdev.write [0xFE, 0x52].chr.join
+          end
+          @state = :prestart
+        when "F6"
+          if @serial
+            @serialdev.write [0xFE, 0x52].chr.join
+          end
+          @state = :auto
+        when "F7"
+          if @serial
+            @serialdev.write [0xFE, 0x52].chr.join
+          end
+          @state = :teleop
+        when "F8"
+          if @serial
+            #@serialdev.write [0xFE, 0x51].chr.join
+          end
+          @state = :postmatch
+        else
         end
-        @state = :prestart
-      when "F6"
-        if @serial
-          @serialdev.write [0xFE, 0x52].chr.join
-        end
-        @state = :auto
-      when "F7"
-        if @serial
-          @serialdev.write [0xFE, 0x52].chr.join
-        end
-        @state = :teleop
-      when "F8"
-        if @serial
-          #@serialdev.write [0xFE, 0x51].chr.join
-        end
-        @state = :postmatch
-      else
+        self.send(@state, event.code_str)
+        redraw
       end
-      self.send(@state, event.code_str)
-      redraw
     end
   end
 
@@ -344,7 +353,7 @@ class GenericScout
     end
     redraw_teleop
   end
- 
+
   def teleop_low_goal e
     case e
     when /^[0-9]$/
@@ -363,14 +372,9 @@ class GenericScout
 
   def redraw_postmatch
     @data['comments'] ||= ''
-    lines = @data['comments'].scan(/.{,16}/)
-    if lines.count > 2
-    @lines[0] = lines[-2]
-    @lines[1] = lines[-1]
-    else
-    @lines[0] = lines[0] || ''
-    @lines[1] = lines[1] || ''
-    end
+    lines = @data['comments'].scan(/.{1,16}/)
+    @lines[0] = lines[-2] || ''
+    @lines[1] = lines[-1] || ''
   end
 
   def postmatch e
@@ -378,7 +382,7 @@ class GenericScout
     @lines[0] = e.ljust(16)
     case e
     when /^[A-Z0-9]$/
-        @data['comments'] += e
+      @data['comments'] += e
     when 'Backspace'
       @data['comments'] = @data['comments'][0...-1]
     when 'Space'
@@ -392,15 +396,24 @@ class GenericScout
     when 'Esc'
       @data['team'] = @team
       @data['type'] = "Match"
+      @data['position'] = @label
+      @data['match'] = @match
       @database.pushData(@data)
+      @state = :prestart
+      tmp = @matchq.pop
+      @match = tmp[0]
+      @team = tmp[1][@label]
+
+      redraw_prestart
     end
-    redraw_postmatch
+    redraw_postmatch unless @state == :prestart
   end
 
   def parse_message topic, event, data
     case event
     when 'NewMatch'
-      @match = data['data']
+      @matchq.push [data['match'], data['teams']]
     end
+    redraw
   end
 end
