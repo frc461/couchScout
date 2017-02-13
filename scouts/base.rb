@@ -2,6 +2,7 @@ require 'curses'
 
 class GenericScout
   attr_reader :label, :team, :state
+
   def initialize label, dev, x, y, w, h, serial, ov
     @device = DevInput.new dev unless dev == '/dev/null'
     @win = Curses::Window.new(h,w,y,x)
@@ -23,12 +24,33 @@ class GenericScout
     @data = {}
     @overwatch = ov
     @database = Database.new
-    if serial 
+    @data['start_position'] = 0
+    @data['auto_high_goal'] = ''
+    @data['auto_low_goal'] = ''
+    @data['auto_gear_pos'] = 0
+    @data['auto_baseline'] = false
+    @data['auto_violaion'] = 0
+    @data['auto_hopper'] = 0
+    @data['teleop_high_goal'] = ''
+    @data['teleop_low_goal'] = ''
+    @data['teleop_gear'] = 0
+    @data['teleop_hopper'] = 0
+    @data['collect_human'] = false
+    @data['collect_floor'] = false
+    @data['collect_hopper'] = false
+    @data['teleop_violation'] = 0
+    @data['climbed'] = false
+    @data['comments'] = ''
+    if serial  && serial != '/dev/null'
       @serialdev = SerialPort.new(serial, 9600, 8, 1, 0)
     else
       @serialdev = nil
     end
     redraw
+  end
+
+  def dataInit
+
   end
 
   def build_color_array(color)
@@ -103,13 +125,6 @@ class GenericScout
   end
 
   def run
-    message = @overwatch.pop(@label)
-    topic = message.delete('tp')
-    ev = message.delete('ev')
-    parse_message(topic, ev, message)
-    tmp = @matchq.pop
-    @match = tmp[0]
-    @team = tmp[1][@label]
     if @device
       @device.each do |event|
         # reject everything but key events
@@ -155,16 +170,17 @@ class GenericScout
     end
   end
 
-  def method_missing m, args
-    redraw
-    @lines[0] = "MISSING METHOD"
-    @lines[1] = m
-  end
+  #def method_missing m, args
+  #  redraw
+  #  @lines[0] = "MISSING METHOD"
+  #  @lines[1] = m
+  #end
 
   def redraw_prestart
-    @lines[0] = "#{@team.rjust(4, '0')}          #{label}".ljust(16)
+    @lines[0] = "#{(@team.to_s || 'X').rjust(4, '0')}          #{label}".ljust(16)
     @lines[1] = "MATCH#{@match.to_s.rjust(4, '0')} POS#{@data['start_position']}" 
   end
+
 
   def prestart e
     @bg = @label.match(/R/) ? Curses::COLOR_RED : Curses::COLOR_BLUE
@@ -181,6 +197,11 @@ class GenericScout
       @data['start_position'] = 2
     when 'F'
       @data['start_position'] = 3
+    when 'Esc'
+      tmp = @matchq.pop
+      @match = tmp[0]
+      @team = tmp[1][@label].to_s
+      @data['team'] = @team
     end
     redraw_prestart
   end
@@ -241,18 +262,19 @@ class GenericScout
     end
     redraw_auto
   end
-
+  
   def auto_high_goal e
     case e     
     when /^[0-9]$/
       @data['auto_high_goal'] ||= ''
       if @data['auto_high_goal'].length < 2
         @data['auto_high_goal'] += e
-      else @state = :auto
+        @state = :auto if @data['auto_high_goal'].length >= 2
       end
     end
     redraw_auto
   end
+
   def auto_low_goal e
     case e
     when /^[0-9]$/
@@ -260,7 +282,7 @@ class GenericScout
 
       if @data['auto_low_goal'].length < 2
         @data['auto_low_goal'] += e
-      else @state = :auto
+        @state = :auto if @data['auto_low_goal'].length >= 2
       end
     end
     redraw_auto
@@ -402,7 +424,7 @@ class GenericScout
       @state = :prestart
       tmp = @matchq.pop
       @match = tmp[0]
-      @team = tmp[1][@label]
+      @team = tmp[1][@label].to_s
 
       redraw_prestart
     end
@@ -412,7 +434,7 @@ class GenericScout
   def parse_message topic, event, data
     case event
     when 'NewMatch'
-      @matchq.push [data['match'], data['teams']]
+      @matchq.push [data['match'], data['events']]
     end
     redraw
   end

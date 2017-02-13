@@ -6,15 +6,17 @@ require './lib/arrayPatch.rb'
 raw_config = File.read('./config.yml')
 config = YAML.load(raw_config)
 
-raw = `cat /proc/bus/input/devices`
-
-blocks = raw.split "\n\n"
-devs = []
 @queue = Queue.new
 
 config['scouts'].each do |label, scout|
   config['scouts'][label]['dev'] = '/dev/null'
 end
+
+raw = `cat /proc/bus/input/devices`
+
+blocks = raw.split "\n\n"
+devs = []
+ttys = []
 
 blocks.each do |b|
   next unless b.match /sysrq kbd event\d+ leds/
@@ -24,11 +26,12 @@ blocks.each do |b|
 end
 
 Dir.glob("/dev/ttyACM*").each do |screen|
-    @serialdev = SerialPort.new(screen, 9600, 8, 1, 0)
+  serialdev = SerialPort.new(screen, 9600, 8, 1, 0)
 
-    @serialdev.write [0xFE, 0x58].chr.join
-    @serialdev.write "TYPE #{screen[-1]}"
+  serialdev.write [0xFE, 0x58].chr.join
+  serialdev.write "TYPE #{screen[-1]}"
 
+  ttys << serialdev
 end
 
 
@@ -42,11 +45,18 @@ devs.each do |d|
     label = nil
     screen = nil
     dev.each do |e|
+        # reject everything but key events
+        next unless e.type == 1
+        # reject everything but press events
+        next unless e.value == 1
+        # ignore numlock
+        next if e.code == 69
+
       case e.code_str
       when 'Esc'
         screen = '/dev/null'
       when /[0-9]/
-        screen = e
+        screen = '/dev/ttyACM' + e.code_str
       when 'Enter'
         label = 'master'
       when 'A'
@@ -62,24 +72,27 @@ devs.each do |d|
       when 'E'
         label = 'B3'
       end
-    end
-    puts [label, d, screen].join ' - '
-    if label && screen
-    @queue.push [label, d, screen]
-    break
+      puts [label, d, screen].join ' - '
+      if label && screen
+        @queue.push [label, d, screen]
+        break
+      end
     end
   end
 end
 
 threads.each(&:join)
-gets
-file !@queue.empty?
+puts 'Done'
+
+while !@queue.empty?
   label, dev, ser = *@queue.pop
+  puts "*#{label}: #{dev} / #{ser}"
   config['scouts'][label]['dev'] = dev
   config['scouts'][label]['serial'] = ser
+end
 
 File.open('config.yml','w') do |h| 
-   h.write config.to_yaml
+  h.write config.to_yaml
 end
 
 

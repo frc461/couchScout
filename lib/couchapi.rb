@@ -1,6 +1,7 @@
 require 'httparty'
 require 'yaml'
 require 'json'
+require 'csv'
 
 class Database
   raw_config = File.read('./config.yml')
@@ -22,7 +23,7 @@ class Database
     view = p2 || p1
     endpoint = "/test/_design/#{designdoc}/_view/#{view}"
     puts endpoint
-    
+
     response = JSON.parse(self.class.get(endpoint, headers: {Referer: 'vps.boilerinvasion.org'}).body)
   end
 
@@ -37,5 +38,10 @@ end
 
 if __FILE__==$0
   tba = Database.new
-  puts tba.getView 'getMatches'
+  data = tba.getView('getMatches')['rows'].map{|r| r['value']}
+  CSV.open("data.csv","w") do |csv|
+    data.each do |d|
+      csv << d.values
+    end
+  end
 end

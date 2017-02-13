@@ -53,15 +53,15 @@ if __FILE__==$0
   
   match.each do |match|
     matchdata = {}
-    matchdata['b1'] = match["alliances"]["blue"]["teams"][0].gsub(/[frc]/, "").to_i
-    matchdata['b2'] = match["alliances"]["blue"]["teams"][1].gsub(/[frc]/, "").to_i
-    matchdata['b3'] = match["alliances"]["blue"]["teams"][2].gsub(/[frc]/, "").to_i
-    matchdata['r1'] = match["alliances"]["red"]["teams"][0].gsub(/[frc]/, "").to_i
-    matchdata['r2'] = match["alliances"]["red"]["teams"][1].gsub(/[frc]/, "").to_i
-    matchdata['r3'] = match["alliances"]["red"]["teams"][2].gsub(/[frc]/, "").to_i
+    matchdata['B1'] = match["alliances"]["blue"]["teams"][0].gsub(/[frc]/, "").to_i
+    matchdata['B2'] = match["alliances"]["blue"]["teams"][1].gsub(/[frc]/, "").to_i
+    matchdata['B3'] = match["alliances"]["blue"]["teams"][2].gsub(/[frc]/, "").to_i
+    matchdata['R1'] = match["alliances"]["red"]["teams"][0].gsub(/[frc]/, "").to_i
+    matchdata['R2'] = match["alliances"]["red"]["teams"][1].gsub(/[frc]/, "").to_i
+    matchdata['R3'] = match["alliances"]["red"]["teams"][2].gsub(/[frc]/, "").to_i
     allthematches[match["comp_level"] + match["match_number"].to_s] = matchdata
   end
-  matchfile = File.open("../events/#{event}.yaml", "w")
-  matchfile.puts allthematches
+  matchfile = File.open("events/#{event}.yaml", "w")
+  matchfile.puts allthematches.to_yaml
   matchfile.close()
 end
