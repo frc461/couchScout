@@ -8,6 +8,7 @@ class ScoutMaster < GenericScout
     @line = 0
     @event = {}
     @eline = 0
+    @team_entry = ''
   end
 
   def battery_life
@@ -55,6 +56,8 @@ class ScoutMaster < GenericScout
         @state = :schedule
       when "F5"
         @state = :chooseschedule
+      when "F6"
+        @state = :displaydata
       end
       self.send(@state, event.code_str)
     end
@@ -120,4 +123,25 @@ class ScoutMaster < GenericScout
     @win.refresh
 
   end
+    def displaydata
+        when /^[0-9]$/
+      @team_entry += e
+      when 'Enter'
+        if @team_entry = @team
+        displayteamdata
+        end
+    end
+      def displayteamdata
+        @lines[1] = "Team: " + @team
+        @lines[2] = "Auto Info:"
+        @lines[3] = "   start position: " + @data['star_position'] + " | auto high goals: " + @data['auto_high_goal'] + " | auto low goals: " + @data['auto_low_goal'] + " | auto gear position: " + @data['auto_gear_pos'] + " | baseline cross: " + @data['baseline_cross'] + " | auto violations: " + @data['auto_violation'] + " | auto hoppers: " + @data['auto_hopper']
+        @lines[4] = "Teleop Info:"
+        @lines[5] = "   teleop high goals: " + @data['teleop_high_goal'] + " | teleop low goals: " @data['teleop_low_goal'] + " | teleop gears: " + @data['teleop_gear'] + " | teleop hoppers: " + @data['teleop_hopper'] + " | human collection: " + @data['collect_human'] + " | floor collection: " + @data['collect_floor'] + " | hopper collection: " + @data['collect_hopper'] + " | climbed: " @data['climbed'] + " | teleop violations: " + @data['teleop_violation']
+        @lines[6] = "Comments:"
+        @lines[7] = @data['comments']
+          when 'Down'
+            @line = @line + 1 unless @line
+          when 'Up'
+           @line = @line - 1 unless @line < 1
+      end
 end
