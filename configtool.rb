@@ -1,5 +1,6 @@
 require 'yaml'
 require './lib/devinput.rb'
+
 require 'serialport'
 require './lib/arrayPatch.rb'
 
@@ -10,6 +11,7 @@ config = YAML.load(raw_config)
 
 config['scouts'].each do |label, scout|
   config['scouts'][label]['dev'] = '/dev/null'
+  config['scouts'][label]['serial'] = '/dev/null'
 end
 
 raw = `cat /proc/bus/input/devices`

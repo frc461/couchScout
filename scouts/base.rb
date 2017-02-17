@@ -20,10 +20,21 @@ class GenericScout
     @win.bkgd ' '.ord | Curses::color_pair(@bg)
     @uuid = ''
     @lines = ['STARTING UP'.center(15),'CouchScout'.center(16)]
-    @serial = serial
+    @serial = serial unless serial == '/dev/null'
     @data = {}
     @overwatch = ov
     @database = Database.new
+    if serial  && serial != '/dev/null'
+      @serialdev = SerialPort.new(serial, 9600, 8, 1, 0)
+    else
+      @serialdev = nil
+    end
+    redraw
+    initialize_data
+  end
+
+    def initialize_data
+    @data = {}
     @data['start_position'] = 0
     @data['auto_high_goal'] = ''
     @data['auto_low_goal'] = ''
@@ -41,13 +52,7 @@ class GenericScout
     @data['teleop_violation'] = 0
     @data['climbed'] = false
     @data['comments'] = ''
-    if serial  && serial != '/dev/null'
-      @serialdev = SerialPort.new(serial, 9600, 8, 1, 0)
-    else
-      @serialdev = nil
     end
-    redraw
-  end
 
   def dataInit
 
@@ -427,6 +432,7 @@ class GenericScout
       @team = tmp[1][@label].to_s
 
       redraw_prestart
+      intialize_data
     end
     redraw_postmatch unless @state == :prestart
   end

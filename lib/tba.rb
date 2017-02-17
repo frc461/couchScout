@@ -49,7 +49,7 @@ if __FILE__==$0
   #puts tba.events.map{|e| e['key']}
   event = ARGV[0]
   match = tba.getmatch(event)
-  allthematches = {}
+  allTheMatches = []
   
   match.each do |match|
     matchdata = {}
@@ -59,9 +59,12 @@ if __FILE__==$0
     matchdata['R1'] = match["alliances"]["red"]["teams"][0].gsub(/[frc]/, "").to_i
     matchdata['R2'] = match["alliances"]["red"]["teams"][1].gsub(/[frc]/, "").to_i
     matchdata['R3'] = match["alliances"]["red"]["teams"][2].gsub(/[frc]/, "").to_i
-    allthematches[match["comp_level"] + match["match_number"].to_s] = matchdata
+    matchdata['level'] = match["comp_level"]
+    matchdata['number'] = match['match_number']
+    allTheMatches << matchdata
   end
+  allTheMatches.sort_by!{|x| [x['level'], x['number']]}
   matchfile = File.open("events/#{event}.yaml", "w")
-  matchfile.puts allthematches.to_yaml
+  matchfile.puts allTheMatches.to_yaml
   matchfile.close()
 end

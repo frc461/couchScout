@@ -8,6 +8,7 @@ class ScoutMaster < GenericScout
     @line = 0
     @event = {}
     @eline = 0
+    @eventFile = 'None'
   end
 
   def battery_life
@@ -35,6 +36,7 @@ class ScoutMaster < GenericScout
     text Time.now.strftime("%Y-%m-%d %I:%M %p"), 2, @h - 2
 
     @win.refresh
+    
   end
 
   def run
@@ -46,6 +48,9 @@ class ScoutMaster < GenericScout
       # ignore numlock
       next if event.code == 69
 
+    0.upto(@h - 2) do |i|
+        @lines[i] = ''
+    end
       case event.code_str
       when "F2"
         @state = :scoutmaster
@@ -86,15 +91,16 @@ class ScoutMaster < GenericScout
      when 'Down'
        @eline = @eline + 1 unless @eline > @event.length - 2
      end
-     @lines[11] = @eline
-     @currentmatch = @event[@event.keys[@eline]]
-     @lines[10] = @currentmatch
-     @lines[1] = "Red Team 1 " + @currentmatch['R1'].to_s
-     @lines[2] = "Red Team 2 " + @currentmatch['R2'].to_s
-     @lines[3] = "Red Team 3 " + @currentmatch['R3'].to_s
-     @lines[4] = "Blue Team 1 " + @currentmatch['B1'].to_s
-     @lines[5] = "Blue Team 2 " + @currentmatch['B2'].to_s
-     @lines[6] = "Blue Team 3 " + @currentmatch['B3'].to_s
+     @currentmatch = @event[@eline]
+     if @currentmatch
+       @lines[1] = "Match #{@currentmatch['level']} #{@currentmatch['number']}"
+       @lines[4] = "Red Team 1 " + @currentmatch['R1'].to_s
+       @lines[5] = "Red Team 2 " + @currentmatch['R2'].to_s
+       @lines[6] = "Red Team 3 " + @currentmatch['R3'].to_s
+       @lines[7] = "Blue Team 1 " + @currentmatch['B1'].to_s
+       @lines[8] = "Blue Team 2 " + @currentmatch['B2'].to_s
+       @lines[9] = "Blue Team 3 " + @currentmatch['B3'].to_s
+     end
     
      
      redraw
@@ -111,11 +117,14 @@ class ScoutMaster < GenericScout
       when 'Enter'
         event_rawyaml = File.read("./events" + @events[@line])
         @event = YAML.load(event_rawyaml)
+        @eventFile = @events[@line]
     end
     @lines[11] = @line.to_s
+    @lines[10] = @eventFile
+
     redraw
     Curses.attrset(Curses::color_pair(Curses::COLOR_GREEN))
-    text('*' + @lines[@line] + '*', 1, @line + 1)
+    text('*' + @lines[@line].to_s + '*', 1, @line + 1)
     Curses.attrset(Curses::A_NORMAL)
     @win.refresh
 

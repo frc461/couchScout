@@ -10,7 +10,7 @@ Dir[File.dirname(__FILE__) + '/scouts/*.rb'].each {|file| require file }
 raw_config = File.read('./config.yml')
 CONFIG = YAML.load(raw_config)
 
-CONFIG['scouts'].map{|k, s| s['serial'] || nil}.delete_if{|s| s == nil}.each do |y|
+CONFIG['scouts'].map{|k, s| s['serial'] || nil}.delete_if{|s| s == nil || s == "/dev/null"}.each do |y|
   puts 'Waiting on serial ports'
   waiting = true
   while waiting
