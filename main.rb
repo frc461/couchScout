@@ -59,12 +59,12 @@ begin
     end
 
     if safe
+      workers.each do |k, w|
+        puts w.inspect
+      end
       close_screen
       threadpool.each(&:kill)
 
-      workers.each do |w|
-        puts w.inspect
-      end
       puts workers.inspect
 
       puts "Goodbye"

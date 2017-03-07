@@ -15,6 +15,7 @@ class GenericScout
     @team = ''
     @state = :prestart
     @match = nil
+    @event = 'NO EVENT'
     @matchq = Queue.new
     @bg = @label.match(/R/) ? Curses::COLOR_RED : Curses::COLOR_BLUE
     @win.bkgd ' '.ord | Curses::color_pair(@bg)
@@ -32,31 +33,32 @@ class GenericScout
     redraw
     initialize_data
   end
+  
+  def inspect
+    @state + ' ' + @label
+  end
 
     def initialize_data
     @data = {}
     @data['start_position'] = 0
     @data['auto_high_goal'] = ''
-    @data['auto_low_goal'] = ''
+    @data['auto_low_goal'] =''
     @data['auto_gear_pos'] = 0
     @data['auto_baseline'] = false
     @data['auto_violaion'] = 0
     @data['auto_hopper'] = 0
-    @data['teleop_high_goal'] = ''
-    @data['teleop_low_goal'] = ''
+    @data['teleop_violation'] = 0
+    @data['teleop_high_goal'] = ['']
+    @data['teleop_low_goal'] = ['']
     @data['teleop_gear'] = 0
     @data['teleop_hopper'] = 0
     @data['collect_human'] = false
     @data['collect_floor'] = false
     @data['collect_hopper'] = false
-    @data['teleop_violation'] = 0
     @data['climbed'] = false
     @data['comments'] = ''
+    @data['event'] = ''
     end
-
-  def dataInit
-
-  end
 
   def build_color_array(color)
     arr = [0xFE, 0xD0]
@@ -104,6 +106,7 @@ class GenericScout
     text @team.to_s.rjust(4, '0'), 7, 4
     text @match.to_s.rjust(4, '0'), 7, 5
     text @state.to_s, 7, 6
+    text @event.to_s, 3, 7
     @lines[0] = @lines[0].ljust(15)
     @lines[1] = @lines[1].ljust(15)
 
@@ -145,6 +148,21 @@ class GenericScout
           ev = message.delete('ev')
           parse_message(topic, ev, message)
         end
+        
+        if !@match && @matchq.length == 0
+          @lines[0] = "     WAITING    "
+          @lines[1] = "     .......    "
+          redraw
+          message = @overwatch.pop(@label)
+          topic = message.delete('tp')
+          ev = message.delete('ev')
+          parse_message(topic, ev, message)
+          tmp = @matchq.pop
+          @match = tmp[0]
+          @team = tmp[1][@label].to_s
+          @event = tmp[2].to_s
+        end
+
 
         case event.code_str
         when "F5"
@@ -196,17 +214,20 @@ class GenericScout
       end
     when 'Backspace'
       @team = @team[0...-1]
-    when 'S'
+    when 'Q'
       @data['start_position'] = 1
-    when 'D'
+    when 'W'
       @data['start_position'] = 2
-    when 'F'
+    when 'E'
       @data['start_position'] = 3
     when 'Esc'
+      if !@matchq.empty?
       tmp = @matchq.pop
       @match = tmp[0]
       @team = tmp[1][@label].to_s
+      @event = tmp[2].to_s
       @data['team'] = @team
+      end
     end
     redraw_prestart
   end
@@ -238,8 +259,10 @@ class GenericScout
     when 'G'
       @state = :auto_gear
     when 'H'
+      @data['auto_high_goal'] = ''
       @state = :auto_high_goal
     when 'L'
+      @data['auto_low_goal'] = ''
       @state = :auto_low_goal
     when 'Dot'
       @data['auto_violation'] ||= 0
@@ -271,11 +294,8 @@ class GenericScout
   def auto_high_goal e
     case e     
     when /^[0-9]$/
-      @data['auto_high_goal'] ||= ''
-      if @data['auto_high_goal'].length < 2
-        @data['auto_high_goal'] += e
-        @state = :auto if @data['auto_high_goal'].length >= 2
-      end
+      @data['auto_high_goal'] += e
+      @state = :auto if @data['auto_high_goal'].length >= 2
     end
     redraw_auto
   end
@@ -283,19 +303,15 @@ class GenericScout
   def auto_low_goal e
     case e
     when /^[0-9]$/
-      @data['auto_low_goal'] ||= ''
-
-      if @data['auto_low_goal'].length < 2
-        @data['auto_low_goal'] += e
-        @state = :auto if @data['auto_low_goal'].length >= 2
-      end
+      @data['auto_low_goal'] += e
+      @state = :auto if @data['auto_low_goal'].length >= 2
     end
     redraw_auto
   end 
 
   def redraw_teleop
     @lines[0] = "#{@team.rjust(4, '0')} H#{(@data['teleop_high_goal'] || []).last.to_s.rjust(2, '0')} L#{(@data['teleop_low_goal'] || []).last.to_s.rjust(2, '0')}  #{label}".ljust(15)[0..15]
-    @lines[1] = "G#{@data['teleop_gear'].to_s.rjust(2, '0')} D#{@data['teleop_hopper'].to_s.rjust(1, '0')}  #{@data['collect_human'] ? "U" : ' '}#{@data['collect_floor'] ? "I" : ' '}#{@data['collect_hopper'] ? "O" : ' '} #{@data['climbed'] ? "C" : ' '} V#{(@data['teleop_violation'] || 0) > 9 ? '*' : @data['teleop_violation'].to_s.rjust(1, '0')}" 
+    @lines[1] = "G#{@data['teleop_gear'].to_s.rjust(2, '0')} D#{@data['teleop_hopper'].to_s.rjust(1, '0')}  #{@data['collect_human'] ? "P" : ' '}#{@data['collect_floor'] ? "F" : ' '}#{@data['collect_hopper'] ? "H" : ' '} #{@data['climbed'] ? "C" : ' '} V#{(@data['teleop_violation'] || 0) > 9 ? '*' : @data['teleop_violation'].to_s.rjust(1, '0')}" 
   end
 
   def teleop e
@@ -421,18 +437,34 @@ class GenericScout
     when 'Slash'
       @data['comments'] = @data['comments'] + "?"
     when 'Esc'
+      @bg = Curses::COLOR_CYAN
+      @lines[0] = "     SAVING     "
+      @lines[1] = "     ......     "
+      redraw
       @data['team'] = @team
       @data['type'] = "Match"
       @data['position'] = @label
       @data['match'] = @match
+      @data['event'] = @event
       @database.pushData(@data)
-      @state = :prestart
+      initialize_data
+      @lines[0] = "     WAITING    "
+      @lines[1] = "     .......    "
+      redraw
+      unless @matchq.length > 0
+          message = @overwatch.pop(@label)
+          topic = message.delete('tp')
+          ev = message.delete('ev')
+          parse_message(topic, ev, message)
+      end
       tmp = @matchq.pop
       @match = tmp[0]
       @team = tmp[1][@label].to_s
+      @event = tmp[2].to_s
 
+      
+      @state = :prestart
       redraw_prestart
-      intialize_data
     end
     redraw_postmatch unless @state == :prestart
   end
@@ -440,7 +472,7 @@ class GenericScout
   def parse_message topic, event, data
     case event
     when 'NewMatch'
-      @matchq.push [data['match'], data['events']]
+      @matchq.push [data['match'], data['events'], data['event']]
     end
     redraw
   end

@@ -3,17 +3,25 @@ class ScoutMaster < GenericScout
   def initialize  label, dev, x, y, w, h, serial, ov
     super label, dev, x, y, w, h, serial, ov
     @bg = Curses::COLOR_MAGENTA
-    @state = :scoutmaster
+    @state = :chooseschedule
     @lines = []
     @line = 0
     @event = {}
     @eline = 0
     @eventFile = 'None'
     @team_entry = ''
+    @current_event = ''
+    @focus = nil
+    @matches = []
+    chooseschedule ' '
+  end
+
+  def inspect
+    'ScoutMaster'
   end
 
   def battery_life
-      (`cat /sys/class/power_supply/BAT0/charge_now`.to_i / `cat /sys/class/power_supply/BAT0/charge_full`.to_f * 100).round(1)
+    (`cat /sys/class/power_supply/BAT0/charge_now`.to_i / `cat /sys/class/power_supply/BAT0/charge_full`.to_f * 100).round(1)
   end
 
   def power_status
@@ -29,7 +37,7 @@ class ScoutMaster < GenericScout
     @win.box '|', '-'
 
     0.upto(@h - 2) do |i|
-        text @lines[i], 1,i+1
+      text @lines[i], 1,i+1
     end
 
     text " - #{@state.to_s.center(@w - 8)} - ", 1, @h - 3
@@ -37,7 +45,7 @@ class ScoutMaster < GenericScout
     text Time.now.strftime("%Y-%m-%d %I:%M %p"), 2, @h - 2
 
     @win.refresh
-    
+
   end
 
   def run
@@ -49,108 +57,159 @@ class ScoutMaster < GenericScout
       # ignore numlock
       next if event.code == 69
 
-    0.upto(@h - 2) do |i|
+      0.upto(@h - 2) do |i|
         @lines[i] = ''
-    end
+      end
+      oldstate = @state
       case event.code_str
       when "F2"
-        @state = :scoutmaster
-      when "F3"
-        @state = :preview
-      when "F4"
-        @state = :schedule
-      when "F5"
         @state = :chooseschedule
-      when "F6"
+      when "F3"
+        @state = :schedule
+      when "F4"
+        @state = :manualmatch
+      when "F12"
         @state = :displaydata
       end
+      @focus = nil if oldstate != @state
       self.send(@state, event.code_str)
     end
 
   end 
 
-  def scoutmaster e
-     @lines[4] = e.ljust(16) 
-     @lines[5] = ''
-     redraw
-  end
-
-  def preview e
-     @lines[5] = e.ljust(16)
-     redraw
-  end
-
   def schedule e
-     @lines[6] = e.ljust(16) 
-     case e
-     when /^[0-9]/
-       @match_number ||= ''
-       @match_number += e
-     when 'Enter'
-       data = {'tp' => 'ScoutMaster', 'ev' => 'NewMatch', 'events' => @currentmatch, 'match' => @event.keys[@eline]} 
-       @overwatch.push data
-     when 'Up'
-       @eline = @eline - 1 unless @eline < 1
-     when 'Down'
-       @eline = @eline + 1 unless @eline > @event.length - 2
-     end
-     @currentmatch = @event[@eline]
-     if @currentmatch
-       @lines[1] = "Match #{@currentmatch['level']} #{@currentmatch['number']}"
-       @lines[4] = "Red Team 1 " + @currentmatch['R1'].to_s
-       @lines[5] = "Red Team 2 " + @currentmatch['R2'].to_s
-       @lines[6] = "Red Team 3 " + @currentmatch['R3'].to_s
-       @lines[7] = "Blue Team 1 " + @currentmatch['B1'].to_s
-       @lines[8] = "Blue Team 2 " + @currentmatch['B2'].to_s
-       @lines[9] = "Blue Team 3 " + @currentmatch['B3'].to_s
-     end
-    
-     
-     redraw
+    @lines[6] = e.ljust(16) 
+    case e
+    when /^[0-9]/
+      @match_number ||= ''
+      @match_number += e
+    when 'Enter'
+      data = {'tp' => 'ScoutMaster', 'ev' => 'NewMatch', 'events' => @currentmatch, 'match' => @event[@eline]['level'] + @event[@eline]['number'].to_s, 'event' => @current_event} 
+      @overwatch.push data
+    when 'Up'
+      @eline = @eline - 1 unless @eline < 1
+    when 'Down'
+      @eline = @eline + 1 unless @eline > @event.length - 2
+    end
+    @currentmatch = @event[@eline]
+    if @currentmatch
+      @lines[1] = "Match #{@currentmatch['level']} #{@currentmatch['number']}"
+      @lines[4] = "Red Team 1 " + @currentmatch['R1'].to_s
+      @lines[5] = "Red Team 2 " + @currentmatch['R2'].to_s
+      @lines[6] = "Red Team 3 " + @currentmatch['R3'].to_s
+      @lines[7] = "Blue Team 1 " + @currentmatch['B1'].to_s
+      @lines[8] = "Blue Team 2 " + @currentmatch['B2'].to_s
+      @lines[9] = "Blue Team 3 " + @currentmatch['B3'].to_s
+    end
+
+
+    redraw
   end
-  
+
   def chooseschedule e
     @events = Dir.glob("events/*.yaml").map{|x| x.gsub(/events/, "")}
     @lines = @events
     case e
-      when 'Down'
-        @line = @line + 1 unless @line > @events.length - 2 
-      when 'Up'
-        @line = @line - 1 unless @line < 1
-      when 'Enter'
-        event_rawyaml = File.read("./events" + @events[@line])
-        @event = YAML.load(event_rawyaml)
-        @eventFile = @events[@line]
+    when 'Down'
+      @line = @line + 1 unless @line > @events.length - 2 
+    when 'Up'
+      @line = @line - 1 unless @line < 1
+    when 'Enter'
+      @current_event = @events[@eline].match(/([a-zA-Z0-9]+)\.yaml/)[1]
+      event_rawyaml = File.read("./events" + @events[@line])
+      @event = YAML.load(event_rawyaml)
+      @eventFile = @events[@line]
+    when /^[A-Z0-9]$/
+      @current_event += e
     end
-    @lines[11] = @line.to_s
-    @lines[10] = @eventFile
+    @lines[10] = "Current Event: " + (@current_event || 'NONE')
 
     redraw
     Curses.attrset(Curses::color_pair(Curses::COLOR_GREEN))
     text('*' + @lines[@line].to_s + '*', 1, @line + 1)
     Curses.attrset(Curses::A_NORMAL)
     @win.refresh
-
   end
-    def displaydata
-        when /^[0-9]$/
-      @team_entry += e
-      when 'Enter'
-        if @team_entry = @team
-        displayteamdata
-        end
+
+  MANUALMODES = ['level', 'number', 'R1', 'R2', 'R3', 'B1', 'B2', 'B3']
+
+  def manualmatch e
+      @focus ||= 'level'
+    case e
+    when 'Esc'
+      @currentmatch = {}
+      @currentmatch['level'] = ''
+      @currentmatch['number'] = ''
+      @currentmatch['R1'] = ''
+      @currentmatch['R2'] = ''
+      @currentmatch['R3'] = ''
+      @currentmatch['B1'] = ''
+      @currentmatch['B2'] = ''
+      @currentmatch['B3'] = ''
+      @focus = 'level'
+    when 'Tab'
+      @focus = MANUALMODES[MANUALMODES.index(@focus) + 1]
+      @focus ||= 'level'
+    when /^[A-Z0-9]$/
+      @currentmatch[@focus] += e
+    when 'Backspace'
+      @currentmatch[@focus] = @currentmatch[@focus][0...-1]
+    when 'Enter'
+      data = {'tp' => 'ScoutMaster', 'ev' => 'NewMatch', 'events' => @currentmatch, 'match' => @currentmatch['level'] + @currentmatch['number'].to_s, 'event' => @current_event} 
+      @overwatch.push data
     end
-      def displayteamdata
-        @lines[1] = "Team: " + @team
-        @lines[2] = "Auto Info:"
-        @lines[3] = "   start position: " + @data['star_position'] + " | auto high goals: " + @data['auto_high_goal'] + " | auto low goals: " + @data['auto_low_goal'] + " | auto gear position: " + @data['auto_gear_pos'] + " | baseline cross: " + @data['baseline_cross'] + " | auto violations: " + @data['auto_violation'] + " | auto hoppers: " + @data['auto_hopper']
-        @lines[4] = "Teleop Info:"
-        @lines[5] = "   teleop high goals: " + @data['teleop_high_goal'] + " | teleop low goals: " @data['teleop_low_goal'] + " | teleop gears: " + @data['teleop_gear'] + " | teleop hoppers: " + @data['teleop_hopper'] + " | human collection: " + @data['collect_human'] + " | floor collection: " + @data['collect_floor'] + " | hopper collection: " + @data['collect_hopper'] + " | climbed: " @data['climbed'] + " | teleop violations: " + @data['teleop_violation']
-        @lines[6] = "Comments:"
-        @lines[7] = @data['comments']
-          when 'Down'
-            @line = @line + 1 unless @line
-          when 'Up'
-           @line = @line - 1 unless @line < 1
-      end
+    @lines[12] = e
+    @lines[13] = @currentmatch.inspect
+
+    if @currentmatch
+      @lines[1] = 'Editing ' + @focus 
+      @lines[2] = "Match #{@currentmatch['level']} #{@currentmatch['number']}"
+      @lines[4] = "Red Team 1 " + @currentmatch['R1'].to_s
+      @lines[5] = "Red Team 2 " + @currentmatch['R2'].to_s
+      @lines[6] = "Red Team 3 " + @currentmatch['R3'].to_s
+      @lines[7] = "Blue Team 1 " + @currentmatch['B1'].to_s
+      @lines[8] = "Blue Team 2 " + @currentmatch['B2'].to_s
+      @lines[9] = "Blue Team 3 " + @currentmatch['B3'].to_s
+    end
+
+    redraw
+  end
+
+  def displaydata e
+    case e
+    when /^[0-9]$/
+      @team_entry += e
+    when 'Backspace'
+      @team_entry = @team_entry[0...-1]
+    when 'Enter'
+      @matches = @database.matches_for @team_entry
+      @match_index = 0
+    when 'Left'
+      @match_index -= 1 unless @match_index == 0
+    when 'Right'
+      @match_index += 1 unless @match_index == @matches.count-1
+    end
+      displayteamdata
+    redraw
+  end
+
+  def displayteamdata
+    @lines[1] = "Team: " + @team_entry 
+    if @matches && @matches.count > 0
+    @lines[2] = @matches[@match_index]['event'] + " match " + @matches[@match_index]['match']
+    @lines[3] = "Auto Info:"
+    @lines[4] = "   start position: " + @matches[@match_index]['start_position'].to_s + " | auto high goals: " + @matches[@match_index]['auto_high_goal'].to_s + " | auto low goals: " + @matches[@match_index]['auto_low_goal'].to_s
+    @lines[5] = "   auto gear position: " + @matches[@match_index]['auto_gear_pos'].to_s + " | baseline cross: " + @matches[@match_index]['baseline_cross'].to_s + " | auto violations: " + @matches[@match_index]['auto_violation'].to_s
+    @lines[6] = "   auto hoppers: " + @matches[@match_index]['auto_hopper'].to_s
+    @lines[7] = "Teleop Info:"
+    @lines[8] = "   teleop high goals: " + @matches[@match_index]['teleop_high_goal'].to_s + " | teleop low goals: " + @matches[@match_index]['teleop_low_goal'].to_s
+    @lines[9] = "   teleop gears: " + @matches[@match_index]['teleop_gear'].to_s + " | teleop hoppers: " + @matches[@match_index]['teleop_hopper'].to_s + " | human collection: " + @matches[@match_index]['collect_human'].to_s 
+    @lines[10] = "   floor collection: " + @matches[@match_index]['collect_floor'].to_s + " | hopper collection: " + @matches[@match_index]['collect_hopper'].to_s
+    @lines[11] = "   climbed: " + @matches[@match_index]['climbed'].to_s + " | teleop violations: " + @matches[@match_index]['teleop_violation'].to_s
+    @lines[12] = "Comments:"
+    @lines[13] = "   " + @matches[@match_index]['comments'][0...64].to_s
+    @lines[14] = "   " + @matches[@match_index]['comments'][69...129].to_s
+    @lines[14] = "   " + @matches[@match_index]['comments'][138...193].to_s
+    end
+  end
 end
