@@ -25,6 +25,7 @@ class GenericScout
     @data = {}
     @overwatch = ov
     @database = Database.new
+    @name = ''
     if serial  && serial != '/dev/null'
       @serialdev = SerialPort.new(serial, 9600, 8, 1, 0)
     else
@@ -42,7 +43,7 @@ class GenericScout
     @data = {}
     @data['start_position'] = 0
     @data['auto_high_goal'] = ''
-    @data['auto_low_goal'] =''
+    @data['auto_low_goal'] = ''
     @data['auto_gear_pos'] = 0
     @data['auto_baseline'] = false
     @data['auto_violaion'] = 0
@@ -58,6 +59,7 @@ class GenericScout
     @data['climbed'] = false
     @data['comments'] = ''
     @data['event'] = ''
+    @data['fail'] = false
     end
 
   def build_color_array(color)
@@ -102,11 +104,13 @@ class GenericScout
     text " TEAM", 1, 4
     text "MATCH", 1, 5
     text "PHASE", 1, 6
+    text "NAME", 1, 7
     text @overwatch.count(@label).to_s.rjust(2, '0'), 15, 5
     text @team.to_s.rjust(4, '0'), 7, 4
     text @match.to_s.rjust(4, '0'), 7, 5
     text @state.to_s, 7, 6
-    text @event.to_s, 3, 7
+    text @name.to_s, 7, 7
+    text @event.to_s, 3, 8
     @lines[0] = @lines[0].ljust(15)
     @lines[1] = @lines[1].ljust(15)
 
@@ -185,6 +189,11 @@ class GenericScout
             #@serialdev.write [0xFE, 0x51].chr.join
           end
           @state = :postmatch
+        when "F9"
+          if @serial
+             @serialdev.write [0xFE, 0x52].chr.join
+          end
+          @state = :nameentry
         else
         end
         self.send(@state, event.code_str)
@@ -311,7 +320,7 @@ class GenericScout
 
   def redraw_teleop
     @lines[0] = "#{@team.rjust(4, '0')} H#{(@data['teleop_high_goal'] || []).last.to_s.rjust(2, '0')} L#{(@data['teleop_low_goal'] || []).last.to_s.rjust(2, '0')}  #{label}".ljust(15)[0..15]
-    @lines[1] = "G#{@data['teleop_gear'].to_s.rjust(2, '0')} D#{@data['teleop_hopper'].to_s.rjust(1, '0')}  #{@data['collect_human'] ? "P" : ' '}#{@data['collect_floor'] ? "F" : ' '}#{@data['collect_hopper'] ? "H" : ' '} #{@data['climbed'] ? "C" : ' '} V#{(@data['teleop_violation'] || 0) > 9 ? '*' : @data['teleop_violation'].to_s.rjust(1, '0')}" 
+    @lines[1] = "G#{@data['teleop_gear'].to_s.rjust(2, '0')} D#{@data['teleop_hopper'].to_s.rjust(1, '0')}  #{@data['collect_human'] ? "P" : ' '}#{@data['collect_floor'] ? "F" : ' '}#{@data['collect_hopper'] ? "H" : ' '} #{@data['climbed'] ? "C" : ' '} #{@data['fail'] ? "F" : ' '} V#{(@data['teleop_violation'] || 0) > 9 ? '*' : @data['teleop_violation'].to_s.rjust(1, '0')}" 
   end
 
   def teleop e
@@ -376,6 +385,12 @@ class GenericScout
       @state = :teleop_high_goal
     when 'L'
       @state = :teleop_low_goal
+    when 'Q'
+      if @data['fail'] == true
+        @data['fail'] = false
+      else
+        @data['fail'] = true
+      end
     end
     redraw_teleop
   end
@@ -468,7 +483,18 @@ class GenericScout
     end
     redraw_postmatch unless @state == :prestart
   end
-
+  def nameentry e
+    case e
+      when /^[A-Z0-9]$/
+        @name += e
+      when 'Backspace'
+        @name = @name[0...-1]
+    end
+  end
+  
+  def redraw_nameentry
+     @lines[0] = "NAME#{@name}" 
+  end
   def parse_message topic, event, data
     case event
     when 'NewMatch'
