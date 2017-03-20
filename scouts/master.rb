@@ -1,4 +1,4 @@
-require './scouts/base.rb'
+require ./scouts/base.rb'
 class ScoutMaster < GenericScout
   def initialize  label, dev, x, y, w, h, serial, ov
     super label, dev, x, y, w, h, serial, ov
@@ -10,12 +10,20 @@ class ScoutMaster < GenericScout
     @eline = 0
     @eventFile = 'None'
     @team_entry = ''
+    @team_entry2 = ''
+    @match_entry = ''
     @current_event = ''
     @focus = nil
     @matches = []
+    @scout = ['R1', 'R2', 'R3', 'B1', 'B2', 'B3']
     chooseschedule ' '
   end
-
+  def initialize_master_comments
+    @masterdata = {}
+    @masterdata['mastercomments'] = ''
+    @masterdata['team_entry2'] = ''
+    @masterdata['match_entry'] = ''
+  end
   def inspect
     'ScoutMaster'
   end
@@ -70,6 +78,10 @@ class ScoutMaster < GenericScout
         @state = :manualmatch
       when "F12"
         @state = :displaydata
+      when "F11"
+        @state = :masterediting
+      when "F10"
+        @state = :mastercomments
       end
       @focus = nil if oldstate != @state
       self.send(@state, event.code_str)
@@ -81,7 +93,7 @@ class ScoutMaster < GenericScout
     @lines[6] = e.ljust(16) 
     case e
     when /^[0-9]/
-      @match_number ||= ''
+      _i_number ||= ''
       @match_number += e
     when 'Enter'
       data = {'tp' => 'ScoutMaster', 'ev' => 'NewMatch', 'events' => @currentmatch, 'match' => @event[@eline]['level'] + @event[@eline]['number'].to_s, 'event' => @current_event} 
@@ -212,4 +224,78 @@ class ScoutMaster < GenericScout
     @lines[14] = "   " + @matches[@match_index]['comments'][138...193].to_s
     end
   end
+      def mastercomments e
+        case e
+          when "F10"
+            @state = :teamedit
+          when "F9"
+            @state = :matchedit
+          when /^[A-Z0-9]$/
+            @masterdata['comments'] += e
+          when 'Backspace'
+            @masterdata['comments'] = @masterdata['comments'][0...-1]
+          when 'Space'
+            @masterdata['comments'] = @masterdata['comments'] + " "
+          when 'Dot'
+            @masterdata['comments'] = @masterdata['comments'] + "."
+          when 'Comma'
+            @masterdata['comments'] = @masterdata['comments'] + ","
+          when 'Slash'
+            @data['comments'] = @data['comments'] + "?"
+          when 'Esc'
+            @database.pushData(@masterdata)
+            initialize_master_comments
+        end
+        @lines[1] = "Team: " + @masterdata['team_entry2']
+        @lines[2] = "Match: " + @masterdata['match_entry']
+        @lines[3] = "   " + @masterdata['mastercomments'][0...64].to_s
+        @lines[4] = "   " + @masterdata['mastercomments'][69...129].to_s
+        @lines[5] = "   " + @masterdata['mastercomments'][138...193].to_s
+      end
+        def teamedit e
+          case e
+          when /^[0-9]$/
+            @masterdata['team_entry2'] += e
+          when 'Backspace'
+            @masterdata['team_entry2'] = @masterdata['team_entry2'][0...-1]
+          when 'Enter'
+            @state = :mastercomments
+          end
+        end
+        def matchedit e
+        case e
+          when /^[0-9]$/
+            @masterdata['match_entry'] += e
+          when 'Backspace'
+            @masterdata['match_entry'] = @masterdata['match_entry'][0...-1]
+          when 'Enter'
+            @state = :mastercomments
+          end
+        end
+      def masterediting e
+        @scout_index = 0
+        case e
+          when 'Left'
+            @scout_index -= 1 unless @scout_index == 0
+          when 'Right'
+            @scout_index += 1 unless @scout_index == @scout.count-1
+          when /^[A-Z0-9]$/
+            @scout[@scout_index][@data]['comments'] += e
+            @scout[@scout_index][@data]['comments'] = @scout[@scout_index][@data]['comments'][0...-1]
+          when 'Space'
+            @scout[@scout_index][@data]['comments'] = @scout[@scout_index][@data]['comments'] + " "
+          when 'Dot'
+            @scout[@scout_index][@data]['comments'] = @scout[@scout_index][@data]['comments'] + "."
+          when 'Comma'
+            @scout[@scout_index][@data]['comments'] =@scout[@scout_index][@data]['comments'] + ","
+          when 'Slash'
+            @scout[@scout_index][@data]['comments'] = @scout[@scout_index][@data]['comments'] + "?"
+          when 'Esc'
+            @database.pushData(@data)
+        end
+        @lines[1] = "Scout: " + @scout[@scout_index]
+        @lines[2] = @scout[@scout_index]['comments'][0...64].to_s
+        @lines[3] = @scout[@scout_index]['comments'][69...129].to_s
+        @lines[4] = @scout[@scout_index]['comments'][138...193].to_s
+      end
 end
