@@ -1,4 +1,4 @@
-require ./scouts/base.rb'
+require './scouts/base.rb'
 class ScoutMaster < GenericScout
   def initialize  label, dev, x, y, w, h, serial, ov
     super label, dev, x, y, w, h, serial, ov
@@ -15,12 +15,14 @@ class ScoutMaster < GenericScout
     @current_event = ''
     @focus = nil
     @matches = []
-    @scout = ['R1', 'R2', 'R3', 'B1', 'B2', 'B3']
+    @match = {}
+    @team_event_match = ''
     chooseschedule ' '
+    initialize_master_comments
   end
   def initialize_master_comments
     @masterdata = {}
-    @masterdata['mastercomments'] = ''
+    @masterdata['comments'] = ''
     @masterdata['team_entry2'] = ''
     @masterdata['match_entry'] = ''
   end
@@ -80,7 +82,7 @@ class ScoutMaster < GenericScout
         @state = :displaydata
       when "F11"
         @state = :masterediting
-      when "F10"
+      when "F9"
         @state = :mastercomments
       end
       @focus = nil if oldstate != @state
@@ -146,7 +148,7 @@ class ScoutMaster < GenericScout
   MANUALMODES = ['level', 'number', 'R1', 'R2', 'R3', 'B1', 'B2', 'B3']
 
   def manualmatch e
-      @focus ||= 'level'
+    @focus ||= 'level'
     case e
     when 'Esc'
       @currentmatch = {}
@@ -201,101 +203,114 @@ class ScoutMaster < GenericScout
     when 'Right'
       @match_index += 1 unless @match_index == @matches.count-1
     end
-      displayteamdata
+    displayteamdata
     redraw
   end
 
   def displayteamdata
     @lines[1] = "Team: " + @team_entry 
     if @matches && @matches.count > 0
-    @lines[2] = @matches[@match_index]['event'] + " match " + @matches[@match_index]['match']
-    @lines[3] = "Auto Info:"
-    @lines[4] = "   start position: " + @matches[@match_index]['start_position'].to_s + " | auto high goals: " + @matches[@match_index]['auto_high_goal'].to_s + " | auto low goals: " + @matches[@match_index]['auto_low_goal'].to_s
-    @lines[5] = "   auto gear position: " + @matches[@match_index]['auto_gear_pos'].to_s + " | baseline cross: " + @matches[@match_index]['baseline_cross'].to_s + " | auto violations: " + @matches[@match_index]['auto_violation'].to_s
-    @lines[6] = "   auto hoppers: " + @matches[@match_index]['auto_hopper'].to_s
-    @lines[7] = "Teleop Info:"
-    @lines[8] = "   teleop high goals: " + @matches[@match_index]['teleop_high_goal'].to_s + " | teleop low goals: " + @matches[@match_index]['teleop_low_goal'].to_s
-    @lines[9] = "   teleop gears: " + @matches[@match_index]['teleop_gear'].to_s + " | teleop hoppers: " + @matches[@match_index]['teleop_hopper'].to_s + " | human collection: " + @matches[@match_index]['collect_human'].to_s 
-    @lines[10] = "   floor collection: " + @matches[@match_index]['collect_floor'].to_s + " | hopper collection: " + @matches[@match_index]['collect_hopper'].to_s
-    @lines[11] = "   climbed: " + @matches[@match_index]['climbed'].to_s + " | teleop violations: " + @matches[@match_index]['teleop_violation'].to_s
-    @lines[12] = "Comments:"
-    @lines[13] = "   " + @matches[@match_index]['comments'][0...64].to_s
-    @lines[14] = "   " + @matches[@match_index]['comments'][69...129].to_s
-    @lines[14] = "   " + @matches[@match_index]['comments'][138...193].to_s
+      @lines[2] = @matches[@match_index]['event'] + " match " + @matches[@match_index]['match']
+      @lines[3] = "Auto Info:"
+      @lines[4] = "   start position: " + @matches[@match_index]['start_position'].to_s + " | auto high goals: " + @matches[@match_index]['auto_high_goal'].to_s + " | auto low goals: " + @matches[@match_index]['auto_low_goal'].to_s
+      @lines[5] = "   auto gear position: " + @matches[@match_index]['auto_gear_pos'].to_s + " | baseline cross: " + @matches[@match_index]['baseline_cross'].to_s + " | auto violations: " + @matches[@match_index]['auto_violation'].to_s
+      @lines[6] = "   auto hoppers: " + @matches[@match_index]['auto_hopper'].to_s
+      @lines[7] = "Teleop Info:"
+      @lines[8] = "   teleop high goals: " + @matches[@match_index]['teleop_high_goal'].to_s + " | teleop low goals: " + @matches[@match_index]['teleop_low_goal'].to_s
+      @lines[9] = "   teleop gears: " + @matches[@match_index]['teleop_gear'].to_s + " | teleop hoppers: " + @matches[@match_index]['teleop_hopper'].to_s + " | human collection: " + @matches[@match_index]['collect_human'].to_s 
+      @lines[10] = "   floor collection: " + @matches[@match_index]['collect_floor'].to_s + " | hopper collection: " + @matches[@match_index]['collect_hopper'].to_s
+      @lines[11] = "   climbed: " + @matches[@match_index]['climbed'].to_s + " | teleop violations: " + @matches[@match_index]['teleop_violation'].to_s
+      @lines[12] = "Comments:"
+      @lines[13] = "   " + @matches[@match_index]['comments'][0...64].to_s
+      @lines[14] = "   " + @matches[@match_index]['comments'][69...129].to_s
+      @lines[14] = "   " + @matches[@match_index]['comments'][138...193].to_s
     end
   end
-      def mastercomments e
-        case e
-          when "F10"
-            @state = :teamedit
-          when "F9"
-            @state = :matchedit
-          when /^[A-Z0-9]$/
-            @masterdata['comments'] += e
-          when 'Backspace'
-            @masterdata['comments'] = @masterdata['comments'][0...-1]
-          when 'Space'
-            @masterdata['comments'] = @masterdata['comments'] + " "
-          when 'Dot'
-            @masterdata['comments'] = @masterdata['comments'] + "."
-          when 'Comma'
-            @masterdata['comments'] = @masterdata['comments'] + ","
-          when 'Slash'
-            @data['comments'] = @data['comments'] + "?"
-          when 'Esc'
-            @database.pushData(@masterdata)
-            initialize_master_comments
-        end
-        @lines[1] = "Team: " + @masterdata['team_entry2']
-        @lines[2] = "Match: " + @masterdata['match_entry']
-        @lines[3] = "   " + @masterdata['mastercomments'][0...64].to_s
-        @lines[4] = "   " + @masterdata['mastercomments'][69...129].to_s
-        @lines[5] = "   " + @masterdata['mastercomments'][138...193].to_s
+  def mastercomments e
+    case e
+    when "F10"
+      @state = :teamedit
+    when "F8"
+      @state = :matchedit
+    when /^[A-Z0-9]$/
+      @masterdata['comments'] += e
+    when 'Backspace'
+      @masterdata['comments'] = @masterdata['comments'][0...-1]
+    when 'Space'
+      @masterdata['comments'] = @masterdata['comments'] + " "
+    when 'Dot'
+      @masterdata['comments'] = @masterdata['comments'] + "."
+    when 'Comma'
+      @masterdata['comments'] = @masterdata['comments'] + ","
+    when 'Slash'
+      @masterdata['comments'] = @masterdata['comments'] + "?"
+    when 'Esc'
+      @database.pushData(@masterdata)
+      initialize_master_comments
+    end
+    @lines[1] = "Team: " + @masterdata['team_entry2']
+    @lines[2] = "Match: " + @masterdata['match_entry']
+    @lines[3] = "   " + @masterdata['comments'][0...64].to_s
+    @lines[4] = "   " + @masterdata['comments'][69...129].to_s
+    @lines[5] = "   " + @masterdata['comments'][138...193].to_s
+    redraw
+  end
+  def teamedit e
+    case e
+    when /^[0-9]$/
+      @masterdata['team_entry2'] += e
+    when 'Backspace'
+      @masterdata['team_entry2'] = @masterdata['team_entry2'][0...-1]
+    when 'Enter'
+      @state = :mastercomments
+    end
+  end
+  def matchedit e
+    case e
+    when /^[0-9]$/
+      @masterdata['match_entry'] += e
+    when 'Backspace'
+      @masterdata['match_entry'] = @masterdata['match_entry'][0...-1]
+    when 'Enter'
+      @state = :mastercomments
+    end
+  end
+  def masterediting e
+    if @match['comments'] 
+      case e
+      when /^[A-Z0-9]$/
+        @match['comments'] += e
+      when 'Backspace'
+        @match['comments'] = @match['comments'][0...-1]
+      when 'Space'
+        @match['comments'] = @match['comments'] + " "
+      when 'Dot'
+        @match['comments'] = @match['comments'] + "."
+      when 'Comma'
+        @match['comments'] = @match['comments'] + ","
+      when 'Slash'
+        @match['comments'] = @match['comments'] + "?"
+      when 'Esc'
+        @database.pushData(@match['comments'])
       end
-        def teamedit e
-          case e
-          when /^[0-9]$/
-            @masterdata['team_entry2'] += e
-          when 'Backspace'
-            @masterdata['team_entry2'] = @masterdata['team_entry2'][0...-1]
-          when 'Enter'
-            @state = :mastercomments
-          end
-        end
-        def matchedit e
-        case e
-          when /^[0-9]$/
-            @masterdata['match_entry'] += e
-          when 'Backspace'
-            @masterdata['match_entry'] = @masterdata['match_entry'][0...-1]
-          when 'Enter'
-            @state = :mastercomments
-          end
-        end
-      def masterediting e
-        @scout_index = 0
-        case e
-          when 'Left'
-            @scout_index -= 1 unless @scout_index == 0
-          when 'Right'
-            @scout_index += 1 unless @scout_index == @scout.count-1
-          when /^[A-Z0-9]$/
-            @scout[@scout_index][@data]['comments'] += e
-            @scout[@scout_index][@data]['comments'] = @scout[@scout_index][@data]['comments'][0...-1]
-          when 'Space'
-            @scout[@scout_index][@data]['comments'] = @scout[@scout_index][@data]['comments'] + " "
-          when 'Dot'
-            @scout[@scout_index][@data]['comments'] = @scout[@scout_index][@data]['comments'] + "."
-          when 'Comma'
-            @scout[@scout_index][@data]['comments'] =@scout[@scout_index][@data]['comments'] + ","
-          when 'Slash'
-            @scout[@scout_index][@data]['comments'] = @scout[@scout_index][@data]['comments'] + "?"
-          when 'Esc'
-            @database.pushData(@data)
-        end
-        @lines[1] = "Scout: " + @scout[@scout_index]
-        @lines[2] = @scout[@scout_index]['comments'][0...64].to_s
-        @lines[3] = @scout[@scout_index]['comments'][69...129].to_s
-        @lines[4] = @scout[@scout_index]['comments'][138...193].to_s
+    else
+      case e
+      when /^[A-Z0-9]$/
+        @team_event_match+= e
+      when 'Backspace'
+        @team_event_match = @team_event_match[0...-1]
+      when 'Minus'
+        @team_event_match = @team_event_match + "-"
+      when 'Esc'
+        @match = @database.match_for @team_event_match 
       end
+    end
+    @lines[1] = @team_event_match
+    @lines[2] = "Team: " + @match['team'].to_s
+    @lines[3] = "Match: " + @match['match'].to_s
+    @lines[4] = @match['comments'].to_s[0...64].to_s
+    @lines[5] = @match['comments'].to_s[65...129].to_s
+    @lines[6] = @match['comments'].to_s[130...193].to_s
+    redraw
+  end
 end

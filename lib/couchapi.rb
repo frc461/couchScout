@@ -19,10 +19,14 @@ class Database
     JSON.parse(self.class.get('/_uuids').body)['uuids'].first
   end
 
-  def getView p1, p2=nil
+  def getView p1, keyFilter=nil
     designdoc = p1
-    view = p2 || p1
-    endpoint = "/#{@database}/_design/#{designdoc}/_view/#{view}"
+    view = p1
+    if keyFilter
+      endpoint = "/#{@database}/_design/#{designdoc}/_view/#{view}?key=#{CGI.escape('"' + keyFilter + '"')}"
+    else
+      endpoint = "/#{@database}/_design/#{designdoc}/_view/#{view}"
+    end
     puts endpoint
     response = JSON.parse(self.class.get(endpoint).body)
   end
@@ -46,16 +50,29 @@ class Database
       nil
     end
   end
+
+  def match_for(team_match_event)
+    if res=getView('getEventTeamMatch', team_match_event.downcase)
+      if res['rows']
+        res['rows'].map{|e| e['value']}.first
+      else
+        nil
+      end
+    else
+      nil
+    end
+  end
 end
+
 
 if __FILE__==$0
   tba = Database.new
   puts tba.database
   data = tba.getView('getMatches')['rows'].map{|r| r['value']}
   CSV.open("data.csv","w") do |csv|
-    csv << ['team', 'match', 'position', 'start_position', 'auto_high_goal', 'auto_low_goal', 'auto_gear', 'teleop_gears', 'teleop_high_goal', 'teleop_low_goal',  'climb']
+    csv << ['event', 'team', 'match', 'position', 'start_position', 'auto_high_goal', 'auto_low_goal', 'auto_gear', 'teleop_gears', 'teleop_high_goal', 'teleop_low_goal',  'climb']
     data.each do |d|
-      csv << [d['team'], d['match'], d['position'], d['start_position'], d['auto_high_goal'], d['auto_low_goal'], (d['auto_gear_pos'].to_i > 0 ? 1 : 0), d['teleop_gear'].to_i, d['teleop_high_goal'].map{|i| i.to_i}.inject(&:+), d['teleop_low_goal'].map{|i| i.to_i}.inject(&:+), (d['climbed'] ? 1 : 0), d['comments']]
+      csv << [d['event'], d['team'], d['match'], d['position'], d['start_position'], d['auto_high_goal'], d['auto_low_goal'], (d['auto_gear_pos'].to_i > 0 ? 1 : 0), d['teleop_gear'].to_i, d['teleop_high_goal'].map{|i| i.to_i}.inject(&:+), d['teleop_low_goal'].map{|i| i.to_i}.inject(&:+), (d['climbed'] ? 1 : 0), d['comments']]
     end
   end
 end
