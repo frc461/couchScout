@@ -19,12 +19,15 @@ class ScoutMaster < GenericScout
     @team_event_match = ''
     chooseschedule ' '
     initialize_master_comments
+    @event_team_match = ''
   end
   def initialize_master_comments
     @masterdata = {}
+    @masterdata['event_entry'] = ''
     @masterdata['comments'] = ''
     @masterdata['team_entry2'] = ''
     @masterdata['match_entry'] = ''
+    @state2 = :event_team_match_edit
   end
   def inspect
     'ScoutMaster'
@@ -82,7 +85,7 @@ class ScoutMaster < GenericScout
         @state = :displaydata
       when "F11"
         @state = :masterediting
-      when "F9"
+      when "F10"
         @state = :mastercomments
       end
       @focus = nil if oldstate != @state
@@ -227,90 +230,87 @@ class ScoutMaster < GenericScout
     end
   end
   def mastercomments e
-    case e
-    when "F10"
-      @state = :teamedit
-    when "F8"
-      @state = :matchedit
-    when /^[A-Z0-9]$/
-      @masterdata['comments'] += e
-    when 'Backspace'
-      @masterdata['comments'] = @masterdata['comments'][0...-1]
-    when 'Space'
-      @masterdata['comments'] = @masterdata['comments'] + " "
-    when 'Dot'
-      @masterdata['comments'] = @masterdata['comments'] + "."
-    when 'Comma'
-      @masterdata['comments'] = @masterdata['comments'] + ","
-    when 'Slash'
-      @masterdata['comments'] = @masterdata['comments'] + "?"
-    when 'Esc'
-      @database.pushData(@masterdata)
-      initialize_master_comments
-    end
-    @lines[1] = "Team: " + @masterdata['team_entry2']
-    @lines[2] = "Match: " + @masterdata['match_entry']
-    @lines[3] = "   " + @masterdata['comments'][0...64].to_s
-    @lines[4] = "   " + @masterdata['comments'][69...129].to_s
-    @lines[5] = "   " + @masterdata['comments'][138...193].to_s
-    redraw
-  end
-  def teamedit e
-    case e
-    when /^[0-9]$/
-      @masterdata['team_entry2'] += e
-    when 'Backspace'
-      @masterdata['team_entry2'] = @masterdata['team_entry2'][0...-1]
-    when 'Enter'
-      @state = :mastercomments
-    end
-  end
-  def matchedit e
-    case e
-    when /^[0-9]$/
-      @masterdata['match_entry'] += e
-    when 'Backspace'
-      @masterdata['match_entry'] = @masterdata['match_entry'][0...-1]
-    when 'Enter'
-      @state = :mastercomments
-    end
-  end
-  def masterediting e
-    if @match['comments'] 
+    if @state2 == :event_team_match_edit
       case e
       when /^[A-Z0-9]$/
-        @match['comments'] += e
+        @event_team_match += e
       when 'Backspace'
-        @match['comments'] = @match['comments'][0...-1]
-      when 'Space'
-        @match['comments'] = @match['comments'] + " "
-      when 'Dot'
-        @match['comments'] = @match['comments'] + "."
-      when 'Comma'
-        @match['comments'] = @match['comments'] + ","
-      when 'Slash'
-        @match['comments'] = @match['comments'] + "?"
-      when 'Esc'
-        @database.pushData(@match['comments'])
-      end
-    else
-      case e
-      when /^[A-Z0-9]$/
-        @team_event_match+= e
-      when 'Backspace'
-        @team_event_match = @team_event_match[0...-1]
+        @event_team_match = @event_team_match[0...-1]
       when 'Minus'
-        @team_event_match = @team_event_match + "-"
+        @event_team_match = @event_team_match + "-"
+      when 'Tab'
+        @state2 = :comments
+      end
+      @lines[1] = @event_team_match
+    elsif @state2 == :comments
+      @event_team_match.downcase
+      entry_array = @event_team_match.split('-')
+      @masterdata['event_entry'] = entry_array[0]
+      @masterdata['team_entry2'] = entry_array[1]
+      @masterdata['match_entry'] = entry_array[2]
+      @lines[1] = 'Team: ' + @masterdata['team_entry2']
+      @lines[2] = 'Match: ' + @masterdata['match_entry']
+      @lines[4] = @masterdata['comments'].to_s[0...64].to_s
+      @lines[5] = @masterdata['comments'].to_s[65...129].to_s
+      @lines[6] = @masterdata['comments'].to_s[130...194].to_s
+      case e
+      when /^[A-Z0-9]$/
+        @masterdata['comments'] += e
+      when 'Backspace'
+        @masterdata['comments'] = @masterdata['comments'][0...-1]
+      when 'Space'
+        @masterdata['comments'] = @masterdata['comments'] + " "
+      when 'Dot'
+        @masterdata['comments'] = @masterdata['comments'] + "."
+      when 'Comma'
+        @masterdata['comments'] = @masterdata['comments'] + ","
+      when 'Slash'
+        @masterdata['comments'] = @masterdata['comments'] + "?"
       when 'Esc'
-        @match = @database.match_for @team_event_match 
+        @database.pushData(@masterdata)
+        initialize_master_comments
+      when 'Tab'
+        @state2 == :event_team_match_edit
       end
     end
-    @lines[1] = @team_event_match
-    @lines[2] = "Team: " + @match['team'].to_s
-    @lines[3] = "Match: " + @match['match'].to_s
-    @lines[4] = @match['comments'].to_s[0...64].to_s
-    @lines[5] = @match['comments'].to_s[65...129].to_s
-    @lines[6] = @match['comments'].to_s[130...193].to_s
-    redraw
+  redraw
+end
+def masterediting e
+  if @match['comments'] 
+    case e
+    when /^[A-Z0-9]$/
+      @match['comments'] += e
+    when 'Backspace'
+      @match['comments'] = @match['comments'][0...-1]
+    when 'Space'
+      @match['comments'] = @match['comments'] + " "
+    when 'Dot'
+      @match['comments'] = @match['comments'] + "."
+    when 'Comma'
+      @match['comments'] = @match['comments'] + ","
+    when 'Slash'
+      @match['comments'] = @match['comments'] + "?"
+    when 'Esc'
+      @database.pushData(@match['comments'])
+    end
+  else
+    case e
+    when /^[A-Z0-9]$/
+      @team_event_match+= e
+    when 'Backspace'
+      @team_event_match = @team_event_match[0...-1]
+    when 'Minus'
+      @team_event_match = @team_event_match + "-"
+    when 'Esc'
+      @match = @database.match_for @team_event_match 
+    end
   end
+  @lines[1] = @team_event_match
+  @lines[2] = "Team: " + @match['team'].to_s
+  @lines[3] = "Match: " + @match['match'].to_s
+  @lines[4] = @match['comments'].to_s[0...64].to_s
+  @lines[5] = @match['comments'].to_s[65...129].to_s
+  @lines[6] = @match['comments'].to_s[130...193].to_s
+  redraw
+end
 end
