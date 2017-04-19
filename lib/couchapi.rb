@@ -1,3 +1,5 @@
+#Communicate with couchdb server (local)
+
 require 'httparty'
 require 'yaml'
 require 'json'

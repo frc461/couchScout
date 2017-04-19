@@ -1,3 +1,5 @@
+#I think youre supposed to run this when starting maybe. Check main.rb
+
 require 'yaml'
 require './lib/devinput.rb'
 

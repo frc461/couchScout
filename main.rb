@@ -1,3 +1,5 @@
+#I think youre supposed to run this when starting maybe. Check configtool.rb
+
 require 'yaml'
 require 'json'
 

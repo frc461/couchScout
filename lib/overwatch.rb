@@ -1,3 +1,5 @@
+#Communicate between each module/keyboard/device
+
 class Overwatch
   def initialize
     @pool = {}
