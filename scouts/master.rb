@@ -1,5 +1,4 @@
-#Actually pretty generic (mostly)
-#Should modify super to some other generic class
+#Scout "Master" for 2017 "Steamworks" game
 
 require './scouts/base.rb'
 class ScoutMaster < GenericScout
