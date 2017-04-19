@@ -1,3 +1,5 @@
+#Communicate to server for game data
+
 require 'yaml'
 require 'httparty'
 require 'json'

@@ -1,3 +1,6 @@
+#Actually pretty generic (mostly)
+#Should modify super to some other generic class
+
 require './scouts/base.rb'
 class ScoutMaster < GenericScout
   def initialize  label, dev, x, y, w, h, serial, ov

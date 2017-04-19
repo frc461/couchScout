@@ -1,3 +1,6 @@
+#Not actually a generic scout
+#Specific to 2016-2017 season
+
 require 'curses'
 
 class GenericScout
